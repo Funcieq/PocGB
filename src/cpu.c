@@ -93,6 +93,25 @@ uint8_t cpu_read_r8(CPU *cpu, Bus *bus, uint8_t reg) {
     }
 }
 
+uint16_t cpu_fetch16(CPU *cpu, const Bus *bus) {
+    uint16_t value = bus_read(bus, cpu->pc++);
+    value |= bus_read(bus, cpu->pc++) << 8;
+    return value;
+}
+
+void cpu_write_r8(CPU *cpu, Bus *bus, uint8_t reg, uint8_t value) {
+    switch (reg) {
+        case 0: cpu->b = value; break;
+        case 1: cpu->c = value; break;
+        case 2: cpu->d = value; break;
+        case 3: cpu->e = value; break;
+        case 4: cpu->h = value; break;
+        case 5: cpu->l = value; break;
+        case 6: bus_write(bus, cpu_get_hl(cpu), value); break;
+        case 7: cpu->a = value; break;
+    }
+}
+
 void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode) {
     // ADD A, r8
     if (opcode >= 0x80 && opcode <= 0x87) {
@@ -100,6 +119,35 @@ void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode) {
         uint8_t value = cpu_read_r8(cpu, bus, reg);
 
         cpu_add_a(cpu, value);
+        return;
+    }
+    // LD r8, r8
+    if (opcode >= 0x40 && opcode <= 0x7F && opcode != 0x76) {
+        uint8_t dst = (opcode >> 3) & 0x07;
+        uint8_t src = opcode & 0x07;
+        uint8_t value = cpu_read_r8(cpu, bus, src);
+        cpu_write_r8(cpu, bus, dst, value);
+        return;
+    }
+
+    // LD r8, d8
+    if ((opcode & 0xC7) == 0x06){
+        uint8_t dst = (opcode >> 3) & 0x07;
+        uint8_t value = bus_read(bus, cpu->pc++);
+        cpu_write_r8(cpu, bus, dst, value);
+        return;
+    }
+
+    // LD r16, d16
+    if ((opcode & 0xCF) == 0x01) {
+        uint8_t dst = (opcode >> 4) & 0x03;
+        uint16_t value = cpu_fetch16(cpu, bus);
+        switch (dst) {
+            case 0: cpu_set_bc(cpu, value); break;
+            case 1: cpu_set_de(cpu, value); break;
+            case 2: cpu_set_hl(cpu, value); break;
+            case 3: cpu_set_sp(cpu, value); break;
+        }
         return;
     }
 
