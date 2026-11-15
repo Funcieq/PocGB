@@ -10,6 +10,6 @@ typedef struct {
     uint8_t e;
     uint8_t h;
     uint8_t l;
-    uint16_t sp[2];
+    uint16_t sp;
     uint16_t pc;
 } CPU;
