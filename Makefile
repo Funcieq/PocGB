@@ -1,6 +1,10 @@
+CC = gcc
+TARGET = build/pocgb
+SRCS = src/main.c
+CFLAGS = -std=c17 -Wall -Wextra -Iinclude
 build/pocgb: src/main.c
 	mkdir -p build
-	gcc src/main.c -o build/pocgb
+	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS)
 
 run: build/pocgb
-	./build/pocgb
+	./$(TARGET)
