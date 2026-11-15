@@ -87,7 +87,7 @@ uint8_t cpu_read_r8(CPU *cpu, Bus *bus, uint8_t reg) {
         case 3: return cpu->e;
         case 4: return cpu->h;
         case 5: return cpu->l;
-        case 6: return bus_read(bus, cpu_get_hl(cpu));
+        case 6: return bus_read(bus, cpu_read_r16(cpu, 2)); // (HL)
         case 7: return cpu->a;
         default: return 0;
     }
@@ -107,10 +107,29 @@ void cpu_write_r8(CPU *cpu, Bus *bus, uint8_t reg, uint8_t value) {
         case 3: cpu->e = value; break;
         case 4: cpu->h = value; break;
         case 5: cpu->l = value; break;
-        case 6: bus_write(bus, cpu_get_hl(cpu), value); break;
+        case 6: bus_write(bus, cpu_read_r16(cpu, 2), value); break; // (HL)
         case 7: cpu->a = value; break;
     }
 }
+uint16_t cpu_read_r16(CPU *cpu, uint8_t reg) {
+    switch (reg) {
+        case 0: return cpu_get_bc(cpu);
+        case 1: return cpu_get_de(cpu);
+        case 2: return cpu_get_hl(cpu);
+        case 3: return cpu_get_sp(cpu);
+        default: return 0;
+    }
+}
+
+void cpu_write_r16(CPU *cpu, uint8_t reg, uint16_t value) {
+    switch (reg) {
+        case 0: cpu_set_bc(cpu, value); break;
+        case 1: cpu_set_de(cpu, value); break;
+        case 2: cpu_set_hl(cpu, value); break;
+        case 3: cpu_set_sp(cpu, value); break;
+    }
+}
+
 uint8_t cpu_inc8(CPU *cpu, uint8_t value) {
     uint8_t result = value + 1;
 
@@ -251,13 +270,97 @@ void cpu_or_a(CPU *cpu, uint8_t value) {
     cpu_clear_flag(cpu, FLAG_C);
 }
 
+void cpu_adc_a(CPU *cpu, uint8_t value) {
+    //add with carry
+    uint8_t carry = cpu_get_flag(cpu, FLAG_C);
+    uint16_t result = cpu->a + value + carry;
+
+    //Z flag
+    if ((result & 0xFF) == 0) {
+        cpu_set_flag(cpu, FLAG_Z);
+    } else {
+        cpu_clear_flag(cpu, FLAG_Z);
+    }
+
+    //N flag
+    cpu_clear_flag(cpu, FLAG_N);
+
+    //H flag
+    if (((cpu->a & 0x0F) + (value & 0x0F) + carry) > 0x0F) {
+        cpu_set_flag(cpu, FLAG_H);
+    } else {
+        cpu_clear_flag(cpu, FLAG_H);
+    }
+
+    //C flag
+    if (result > 0xFF) {
+        cpu_set_flag(cpu, FLAG_C);
+    } else {
+        cpu_clear_flag(cpu, FLAG_C);
+    }
+
+    cpu->a = (uint8_t)result;
+}
+void cpu_sbc_a(CPU *cpu, uint8_t value) {
+    //subtract with carry
+    uint8_t carry = cpu_get_flag(cpu, FLAG_C);
+    uint16_t result = cpu->a - value - carry;
+
+    //Z flag
+    if ((result & 0xFF) == 0) {
+        cpu_set_flag(cpu, FLAG_Z);
+    } else {
+        cpu_clear_flag(cpu, FLAG_Z);
+    }
+
+    //N flag
+    cpu_set_flag(cpu, FLAG_N);
+
+    //H flag
+    if (((cpu->a & 0x0F) - (value & 0x0F) - carry) < 0) {
+        cpu_set_flag(cpu, FLAG_H);
+    } else {
+        cpu_clear_flag(cpu, FLAG_H);
+    }
+
+    //C flag
+    if (result > 0xFF) {
+        cpu_set_flag(cpu, FLAG_C);
+    } else {
+        cpu_clear_flag(cpu, FLAG_C);
+    }
+
+    cpu->a = (uint8_t)result;
+}
+void cpu_alu(CPU *cpu, uint8_t operation, uint8_t value) {
+    switch (operation) {
+        case 0: cpu_add_a(cpu, value); break;
+        case 1: cpu_adc_a(cpu, value); break;
+        case 2: cpu_sub_a(cpu, value); break;
+        case 3: cpu_sbc_a(cpu, value); break;
+        case 4: cpu_and_a(cpu, value); break;
+        case 5: cpu_xor_a(cpu, value); break;
+        case 6: cpu_or_a(cpu, value); break;
+        case 7: cpu_cp_a(cpu, value); break;
+    }
+}
+
 void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode) {
-    // ADD A, r8
-    if (opcode >= 0x80 && opcode <= 0x87) {
+    // ALU A, r8: 10ooo rrr (operation, source register)
+    if ((opcode & 0xC0) == 0x80) {
+        uint8_t operation = (opcode >> 3) & 0x07;
         uint8_t reg = opcode & 0x07;
         uint8_t value = cpu_read_r8(cpu, bus, reg);
 
-        cpu_add_a(cpu, value);
+        cpu_alu(cpu, operation, value);
+        return;
+    }
+
+    // ALU A, d8: 11ooo110 (operation, immediate operand)
+    if ((opcode & 0xC7) == 0xC6) {
+        uint8_t operation = (opcode >> 3) & 0x07;
+        uint8_t value = cpu_fetch(cpu, bus);
+        cpu_alu(cpu, operation, value);
         return;
     }
     // LD r8, r8
@@ -281,12 +384,7 @@ void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode) {
     if ((opcode & 0xCF) == 0x01) {
         uint8_t dst = (opcode >> 4) & 0x03;
         uint16_t value = cpu_fetch16(cpu, bus);
-        switch (dst) {
-            case 0: cpu_set_bc(cpu, value); break;
-            case 1: cpu_set_de(cpu, value); break;
-            case 2: cpu_set_hl(cpu, value); break;
-            case 3: cpu_set_sp(cpu, value); break;
-        }
+        cpu_write_r16(cpu, dst, value);
         return;
     }
 
@@ -308,58 +406,8 @@ void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode) {
         return;
     }
 
-    // SUB A, r8
-    if (opcode >= 0x90 && opcode <= 0x97) {
-        uint8_t reg = opcode & 0x07;
-        uint8_t value = cpu_read_r8(cpu, bus, reg);
-        cpu_sub_a(cpu, value);
+    if( opcode == 0x00) { //NOP
         return;
-    }
-
-    // CP A, r8
-    if (opcode >= 0xB8 && opcode <= 0xBF) {
-        uint8_t reg = opcode & 0x07;
-        uint8_t value = cpu_read_r8(cpu, bus, reg);
-        cpu_cp_a(cpu, value);
-        return;
-    }
-
-    // AND A, r8
-    if (opcode >= 0xA0 && opcode <= 0xA7) {
-        uint8_t reg = opcode & 0x07;
-        uint8_t value = cpu_read_r8(cpu, bus, reg);
-        cpu_and_a(cpu, value);
-        return;
-    }
-
-    // XOR A, r8
-    if (opcode >= 0xA8 && opcode <= 0xAF) {
-        uint8_t reg = opcode & 0x07;
-        uint8_t value = cpu_read_r8(cpu, bus, reg);
-        cpu_xor_a(cpu, value);
-        return;
-    }
-    // OR A, r8
-    if (opcode >= 0xB0 && opcode <= 0xB7) {
-        uint8_t reg = opcode & 0x07;
-        uint8_t value = cpu_read_r8(cpu, bus, reg);
-        cpu_or_a(cpu, value);
-        return;
-    }
-
-    switch (opcode) {
-        case 0x00:
-            //NOP
-            break;
-        case 0x3E:
-            //LD A, d8
-            cpu->a = bus_read(bus, cpu->pc++);
-            break;
-
-        case 0x06:
-            // LD B, d8
-            cpu->b = bus_read(bus, cpu->pc++);
-            break;
     }
 }
 
