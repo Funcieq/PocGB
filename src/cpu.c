@@ -1,5 +1,7 @@
 #include <cpu.h>
 
+//getters
+
 uint16_t cpu_get_pc(const CPU *cpu) {
     return cpu->pc;
 }
@@ -22,4 +24,34 @@ uint16_t cpu_get_hl(const CPU *cpu) {
 
 uint16_t cpu_get_af(const CPU *cpu) {
     return (cpu->a << 8) | cpu->f;
+}
+
+//setters
+
+void cpu_set_pc(CPU *cpu, uint16_t value) {
+    cpu->pc = value;
+}
+
+void cpu_set_sp(CPU *cpu, uint16_t value) {
+    cpu->sp = value;
+}
+
+void cpu_set_bc(CPU *cpu, uint16_t value) {
+    cpu->b = (value >> 8) & 0xFF;
+    cpu->c = value & 0xFF;
+}
+
+void cpu_set_de(CPU *cpu, uint16_t value) {
+    cpu->d = (value >> 8) & 0xFF;
+    cpu->e = value & 0xFF;
+}
+
+void cpu_set_hl(CPU *cpu, uint16_t value) {
+    cpu->h = (value >> 8) & 0xFF;
+    cpu->l = value & 0xFF;
+}
+
+void cpu_set_af(CPU *cpu, uint16_t value) {
+    cpu->a = (value >> 8) & 0xFF;
+    cpu->f = value & 0xF0;
 }
