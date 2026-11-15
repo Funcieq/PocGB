@@ -1,4 +1,5 @@
 #include <cpu.h>
+#include <stdbool.h>
 
 //getters
 
@@ -54,4 +55,17 @@ void cpu_set_hl(CPU *cpu, uint16_t value) {
 void cpu_set_af(CPU *cpu, uint16_t value) {
     cpu->a = (value >> 8) & 0xFF;
     cpu->f = value & 0xF0;
+}
+
+//flags
+void cpu_set_flag(CPU *cpu, CPUFlag flag) {
+    cpu->f |= flag;
+}
+
+void cpu_clear_flag(CPU *cpu, CPUFlag flag) {
+    cpu->f &= ~flag;
+}
+
+bool cpu_get_flag(const CPU *cpu, CPUFlag flag) {
+    return (cpu->f & flag) != 0;
 }

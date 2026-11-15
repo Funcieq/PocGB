@@ -13,3 +13,10 @@ typedef struct {
     uint16_t sp;
     uint16_t pc;
 } CPU;
+
+typedef enum {
+    FLAG_Z = 1 << 7,
+    FLAG_N = 1 << 6,
+    FLAG_H = 1 << 5,
+    FLAG_C = 1 << 4
+} CPUFlag;
