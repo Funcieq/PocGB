@@ -42,4 +42,4 @@ bool cpu_get_flag(const CPU *cpu, CPUFlag flag);
 uint8_t cpu_fetch(CPU *cpu, const Bus *bus);
 void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode);
 void cpu_add_a(CPU *cpu, uint8_t value);
-
+uint8_t cpu_read_r8(CPU *cpu, Bus *bus, uint8_t reg);

@@ -79,7 +79,30 @@ uint8_t cpu_fetch(CPU *cpu, const Bus *bus) {
     return bus_read(bus, cpu->pc++);
 }
 
+uint8_t cpu_read_r8(CPU *cpu, Bus *bus, uint8_t reg) {
+    switch (reg) {
+        case 0: return cpu->b;
+        case 1: return cpu->c;
+        case 2: return cpu->d;
+        case 3: return cpu->e;
+        case 4: return cpu->h;
+        case 5: return cpu->l;
+        case 6: return bus_read(bus, cpu_get_hl(cpu));
+        case 7: return cpu->a;
+        default: return 0;
+    }
+}
+
 void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode) {
+    // ADD A, r8
+    if (opcode >= 0x80 && opcode <= 0x87) {
+        uint8_t reg = opcode & 0x07;
+        uint8_t value = cpu_read_r8(cpu, bus, reg);
+
+        cpu_add_a(cpu, value);
+        return;
+    }
+
     switch (opcode) {
         case 0x00:
             //NOP
@@ -92,10 +115,6 @@ void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode) {
         case 0x06:
             // LD B, d8
             cpu->b = bus_read(bus, cpu->pc++);
-            break;
-        case 0x80:
-            //ADD A, B
-            cpu_add_a(cpu, cpu->b);
             break;
     }
 }
@@ -111,11 +130,27 @@ void cpu_step(CPU *cpu, Bus *bus) {
 void cpu_add_a(CPU *cpu, uint8_t value){
     uint16_t result = cpu->a + value;
 
-    if(result > 255){
+    //C Flag
+    if(result > 0xFF){ //0xFF looks more cool than 255 lmao
         cpu_set_flag(cpu, FLAG_C);
     } else {
         cpu_clear_flag(cpu, FLAG_C);
     }
+    //Z Flag
+    if((result & 0xFF) == 0){
+        cpu_set_flag(cpu, FLAG_Z);
+    } else {
+        cpu_clear_flag(cpu, FLAG_Z);
+    }
 
+    //N Flag
+    cpu_clear_flag(cpu, FLAG_N);
+
+    //H Flag
+    if(((cpu->a & 0xF) + (value & 0xF)) > 0xF){
+        cpu_set_flag(cpu, FLAG_H);
+    } else {
+        cpu_clear_flag(cpu, FLAG_H);
+    }
     cpu->a = (uint8_t)result;
 }
