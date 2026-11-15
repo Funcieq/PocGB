@@ -93,6 +93,10 @@ void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode) {
             // LD B, d8
             cpu->b = bus_read(bus, cpu->pc++);
             break;
+        case 0x80:
+            //ADD A, B
+            cpu_add_a(cpu, cpu->b);
+            break;
     }
 }
 
@@ -100,4 +104,18 @@ void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode) {
 void cpu_step(CPU *cpu, Bus *bus) {
     uint8_t opcode = cpu_fetch(cpu, bus);
     cpu_execute(cpu, bus, opcode);
+}
+
+//arithmetic operations
+
+void cpu_add_a(CPU *cpu, uint8_t value){
+    uint16_t result = cpu->a + value;
+
+    if(result > 255){
+        cpu_set_flag(cpu, FLAG_C);
+    } else {
+        cpu_clear_flag(cpu, FLAG_C);
+    }
+
+    cpu->a = (uint8_t)result;
 }
