@@ -111,6 +111,145 @@ void cpu_write_r8(CPU *cpu, Bus *bus, uint8_t reg, uint8_t value) {
         case 7: cpu->a = value; break;
     }
 }
+uint8_t cpu_inc8(CPU *cpu, uint8_t value) {
+    uint8_t result = value + 1;
+
+    //Z Flag
+    if (result == 0) {
+        cpu_set_flag(cpu, FLAG_Z);
+    } else {
+        cpu_clear_flag(cpu, FLAG_Z);
+    }
+
+    //N Flag
+    cpu_clear_flag(cpu, FLAG_N);
+
+    //H Flag
+    if ((value & 0x0F) + 1 > 0x0F) {
+        cpu_set_flag(cpu, FLAG_H);
+    } else {
+        cpu_clear_flag(cpu, FLAG_H);
+    }
+
+    return result;
+}
+
+uint8_t cpu_dec8(CPU *cpu, uint8_t value) {
+    uint8_t result = value - 1;
+
+    //Z Flag
+    if (result == 0) {
+        cpu_set_flag(cpu, FLAG_Z);
+    } else {
+        cpu_clear_flag(cpu, FLAG_Z);
+    }
+
+    //N Flag
+    cpu_set_flag(cpu, FLAG_N);
+
+    //H Flag
+    if ((value & 0x0F) == 0) {
+        cpu_set_flag(cpu, FLAG_H);
+    } else {
+        cpu_clear_flag(cpu, FLAG_H);
+    }
+
+    return result;
+}
+
+void cpu_sub_a(CPU *cpu, uint8_t value) {
+    uint16_t result = cpu->a - value;
+
+    //C Flag
+    if (cpu->a < value) {
+        cpu_set_flag(cpu, FLAG_C);
+    } else {
+        cpu_clear_flag(cpu, FLAG_C);
+    }
+
+    //Z Flag
+    if ((result & 0xFF) == 0) {
+        cpu_set_flag(cpu, FLAG_Z);
+    } else {
+        cpu_clear_flag(cpu, FLAG_Z);
+    }
+
+    //N Flag
+    cpu_set_flag(cpu, FLAG_N);
+
+    //H Flag
+    if ((cpu->a & 0x0F) < (value & 0x0F)) {
+        cpu_set_flag(cpu, FLAG_H);
+    } else {
+        cpu_clear_flag(cpu, FLAG_H);
+    }
+
+    cpu->a = (uint8_t)result;
+}
+
+void cpu_cp_a(CPU *cpu, uint8_t value) {
+    uint8_t old_a = cpu->a;
+    cpu_sub_a(cpu, value);
+    cpu->a = old_a;
+}
+void cpu_and_a(CPU *cpu, uint8_t value) {
+    cpu->a &= value;
+
+    //Z Flag
+    if (cpu->a == 0) {
+        cpu_set_flag(cpu, FLAG_Z);
+    } else {
+        cpu_clear_flag(cpu, FLAG_Z);
+    }
+
+    //N Flag
+    cpu_clear_flag(cpu, FLAG_N);
+
+    //H Flag
+    cpu_set_flag(cpu, FLAG_H);
+
+    //C Flag
+    cpu_clear_flag(cpu, FLAG_C);
+}
+
+void cpu_xor_a(CPU *cpu, uint8_t value){
+    cpu->a ^= value;
+
+    //Z Flag
+    if (cpu->a == 0) {
+        cpu_set_flag(cpu, FLAG_Z);
+    } else {
+        cpu_clear_flag(cpu, FLAG_Z);
+    }
+
+    //N Flag
+    cpu_clear_flag(cpu, FLAG_N);
+
+    //H Flag
+    cpu_clear_flag(cpu, FLAG_H);
+
+    //C Flag
+    cpu_clear_flag(cpu, FLAG_C);
+}
+void cpu_or_a(CPU *cpu, uint8_t value) {
+    cpu->a |= value;
+
+    //Z Flag
+    if (cpu->a == 0) {
+        cpu_set_flag(cpu, FLAG_Z);
+    } else {
+        cpu_clear_flag(cpu, FLAG_Z);
+    }
+
+    //N Flag
+    cpu_clear_flag(cpu, FLAG_N);
+
+    //H Flag
+    cpu_clear_flag(cpu, FLAG_H);
+
+    //C Flag
+    cpu_clear_flag(cpu, FLAG_C);
+}
 
 void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode) {
     // ADD A, r8
@@ -148,6 +287,63 @@ void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode) {
             case 2: cpu_set_hl(cpu, value); break;
             case 3: cpu_set_sp(cpu, value); break;
         }
+        return;
+    }
+
+    // INC r8
+    if ((opcode & 0xC7) == 0x04) {
+        uint8_t reg = (opcode >> 3) & 0x07;
+        uint8_t value = cpu_read_r8(cpu, bus, reg);
+        uint8_t result = cpu_inc8(cpu, value);
+        cpu_write_r8(cpu, bus, reg, result);
+        return;
+    }
+
+    // DEC r8
+    if ((opcode & 0xC7) == 0x05) {
+        uint8_t reg = (opcode >> 3) & 0x07;
+        uint8_t value = cpu_read_r8(cpu, bus, reg);
+        uint8_t result = cpu_dec8(cpu, value);
+        cpu_write_r8(cpu, bus, reg, result);
+        return;
+    }
+
+    // SUB A, r8
+    if (opcode >= 0x90 && opcode <= 0x97) {
+        uint8_t reg = opcode & 0x07;
+        uint8_t value = cpu_read_r8(cpu, bus, reg);
+        cpu_sub_a(cpu, value);
+        return;
+    }
+
+    // CP A, r8
+    if (opcode >= 0xB8 && opcode <= 0xBF) {
+        uint8_t reg = opcode & 0x07;
+        uint8_t value = cpu_read_r8(cpu, bus, reg);
+        cpu_cp_a(cpu, value);
+        return;
+    }
+
+    // AND A, r8
+    if (opcode >= 0xA0 && opcode <= 0xA7) {
+        uint8_t reg = opcode & 0x07;
+        uint8_t value = cpu_read_r8(cpu, bus, reg);
+        cpu_and_a(cpu, value);
+        return;
+    }
+
+    // XOR A, r8
+    if (opcode >= 0xA8 && opcode <= 0xAF) {
+        uint8_t reg = opcode & 0x07;
+        uint8_t value = cpu_read_r8(cpu, bus, reg);
+        cpu_xor_a(cpu, value);
+        return;
+    }
+    // OR A, r8
+    if (opcode >= 0xB0 && opcode <= 0xB7) {
+        uint8_t reg = opcode & 0x07;
+        uint8_t value = cpu_read_r8(cpu, bus, reg);
+        cpu_or_a(cpu, value);
         return;
     }
 
