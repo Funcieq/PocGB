@@ -1,5 +1,8 @@
 #include <cpu.h>
+#include <bus.h>
 #include <stdbool.h>
+#include <stdio.h>
+
 
 //getters
 
@@ -68,4 +71,33 @@ void cpu_clear_flag(CPU *cpu, CPUFlag flag) {
 
 bool cpu_get_flag(const CPU *cpu, CPUFlag flag) {
     return (cpu->f & flag) != 0;
+}
+
+//fetch and execute
+
+uint8_t cpu_fetch(CPU *cpu, const Bus *bus) {
+    return bus_read(bus, cpu->pc++);
+}
+
+void cpu_execute(CPU *cpu, Bus *bus, uint8_t opcode) {
+    switch (opcode) {
+        case 0x00:
+            //NOP
+            break;
+        case 0x3E:
+            //LD A, d8
+            cpu->a = bus_read(bus, cpu->pc++);
+            break;
+
+        case 0x06:
+            // LD B, d8
+            cpu->b = bus_read(bus, cpu->pc++);
+            break;
+    }
+}
+
+
+void cpu_step(CPU *cpu, Bus *bus) {
+    uint8_t opcode = cpu_fetch(cpu, bus);
+    cpu_execute(cpu, bus, opcode);
 }

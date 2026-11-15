@@ -24,3 +24,6 @@ make run
 
 - [Pan Docs](https://gbdev.io/pandocs/)
 - [SM83 instruction set](https://gbdev.io/gb-opcodes/optables/)
+
+## AI usage
+AI is used for research and commit names
